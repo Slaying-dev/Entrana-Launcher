@@ -1,0 +1,29 @@
+{
+  "name": "entrana",
+  "version": "1.0.0",
+  "description": "minimalist lost city launcher",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "author": "Slaying",
+  "license": "ISC",
+  "dependencies": {
+    "electron-json-storage": "^4.6.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-window-state": "^5.0.3"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-rpm": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
+    "@electron-forge/plugin-fuses": "^7.11.1",
+    "@electron/fuses": "^1.8.0",
+    "electron": "40.4.1"
+  }
+}
