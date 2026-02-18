@@ -17,7 +17,7 @@ Goal for the project is to make a dead simple, minimalist launcher for Lost City
 
 Session Timer and Idle Timer
 
-<img width="433" height="405" alt="image" src="https://github.com/user-attachments/assets/19cd97e8-7505-4977-b22d-b089258a3be7" />
+<img width="456" height="382" alt="image" src="https://github.com/user-attachments/assets/515490ae-b9d9-4c0e-86fc-bcaadeabd0ef" />
 
 World Select
 
