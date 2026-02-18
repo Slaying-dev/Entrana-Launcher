@@ -91,7 +91,7 @@ window.addEventListener('DOMContentLoaded', () => {
         .idle-timer-overlay {
             position: relative;
             display: none;
-            width:2.2em;
+            width:1.7em;
             height:1.5em;
             background-color:rgba(0,0,0,0.4);
             color:white;
@@ -109,7 +109,7 @@ window.addEventListener('DOMContentLoaded', () => {
         .session-timer-overlay {
             position: relative;
             display: none;
-            width:5.2em;
+            width:4em;
             height:1.5em;
             background-color:rgba(0,0,0,0.4);
             color:white;
