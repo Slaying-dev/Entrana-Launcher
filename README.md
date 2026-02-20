@@ -1,8 +1,9 @@
 ## Entrana Launcher for Lost City
-
-<img width="1356" height="956" alt="image" src="https://github.com/user-attachments/assets/2259b2d2-ae56-4db3-8b14-3f992ef0202d" />
-
 Goal for the project is a minimalist launcher for Lost City with a few important features to make life in 2004 more enjoyable.
+
+<img width="1351" height="979" alt="image" src="https://github.com/user-attachments/assets/835e64d5-decb-4bb0-87c1-b448d72f4aa8" />
+
+
 
 - [90 Second Idle Timer with notifications](#session-timer-and-idle-timer)
 - [Session Timer in either Game Ticks or Real Time](#session-timer-and-idle-timer)
@@ -13,6 +14,7 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 - [Detail select](#other-options)
 - [Screenshots](#other-options)
 - [Warnings for changing detail, world, or closing the launcher if you are currently logged in](#safe-logout-warnings)
+- [Light and Dark modes](#light-and-dark-modes)
 
 ### Build instructions
 1. npm i
@@ -20,7 +22,7 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 
 ### Session Timer and Idle Timer
 
-<img width="456" height="382" alt="image" src="https://github.com/user-attachments/assets/515490ae-b9d9-4c0e-86fc-bcaadeabd0ef" />
+<img width="435" height="126" alt="image" src="https://github.com/user-attachments/assets/1df62f4e-09d7-4f98-b030-003c56309770" />
 
 
 ### Account Manager - 1 click login
@@ -38,7 +40,7 @@ Idea taken from [this post](https://www.reddit.com/r/2004lostcityrs/comments/1mv
 
 ### World Map
 
-<img width="1350" height="955" alt="image" src="https://github.com/user-attachments/assets/e5f48949-4969-4513-a111-c41543583343" />
+<img width="1355" height="981" alt="image" src="https://github.com/user-attachments/assets/26235896-627a-48cc-9327-762443eb3a5d" />
 
 
 ### Other Options
@@ -49,3 +51,9 @@ Idea taken from [this post](https://www.reddit.com/r/2004lostcityrs/comments/1mv
 ### Safe Logout Warnings
 
 <img width="456" height="292" alt="image" src="https://github.com/user-attachments/assets/c5c3e6bb-518b-4a2f-b333-6f3a07102094" />
+
+### Light and Dark modes
+for crazy people who like their eyes to burn
+
+<img width="1351" height="978" alt="image" src="https://github.com/user-attachments/assets/48963656-4e32-4a68-ab0a-4e8ebd1d94d4" />
+
