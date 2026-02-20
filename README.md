@@ -24,7 +24,9 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 
 
 ### Account Manager - 1 click login
+Idea taken from [this post](https://www.reddit.com/r/2004lostcityrs/comments/1mvupbs/tampermonkey_autofill_for_rs2004_login/)
 
+<img width="452" height="207" alt="image" src="https://github.com/user-attachments/assets/0de35eb5-2ab5-47cc-b12e-5d0aef540599" />
 <img width="434" height="291" alt="image" src="https://github.com/user-attachments/assets/4f24385f-25d8-4930-a503-4ec968642e6b" />
 <img width="687" height="299" alt="image" src="https://github.com/user-attachments/assets/751e43ab-0e29-45b0-8e7c-9ece99e73bbf" />
 
