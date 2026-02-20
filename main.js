@@ -19,11 +19,11 @@ let worlds = [], loginStatus = false, accounts = {}, currentWorld, lowMem, idleT
 const warningDefaults = {
     title: 'Warning',
     label: '',
-    icon: './icon.ico',
+    icon: path.join(__dirname, 'icon.ico'),
     buttonLabels:{ok:'Continue', cancel:'Cancel'},
     width: 400,
     menuBarVisible: false,
-    customStylesheet: './prompt.css',
+    customStylesheet: path.join(__dirname, 'prompt.css'),
     inputAttrs: {type: 'hidden'},
     type: 'input'
 }
@@ -79,13 +79,13 @@ function createWindow () {
   //warn user before closing if they are logged in
   mainWindow.on('close', function(e){
     if(loginStatus == true){
-      e.preventDefault();
       prompt({...warningDefaults,
         description : 'You are currently logged in! Closing the launcher now will not log you out for 60 seconds. Are you sure you want to continue?'
       },mainWindow)
       .then((r) => {
           if(r !== null) app.exit(0);
       }).catch(console.error);
+      e.preventDefault();
     }
   });
 
