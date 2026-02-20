@@ -14,7 +14,7 @@ let screenshots = path.join(os.tmpdir(), 'EntranaLauncher', 'Screenshots');
 if (!fs.existsSync(screenshots)) fs.mkdirSync(screenshots);
 
 const defaultTitle = "Entrana  |  Lost City Launcher";
-let worlds = [], loginStatus = false, accounts = {}, currentWorld, lowMem, idleTimer, sessionTimer, loginMusic, mapWindow;
+let worlds = [], loginStatus = false, accounts = {}, currentWorld, lowMem, idleTimer, sessionTimer, loginMusic, mapWindow, latencyThreshold, lastWorldUpdate, pingHistory = [];
 
 const warningDefaults = {
     title: 'Warning',
@@ -156,6 +156,9 @@ app.whenReady().then(() => {
     loginMusic = keys.includes('savedLoginMusic') ? storage.getSync('savedLoginMusic') : {value: true};
     if(!keys.includes('savedLoginMusic')) storage.set('savedLoginMusic', loginMusic);
 
+    latencyThreshold = keys.includes('savedLatencyThreshold') ? storage.getSync('savedLatencyThreshold') : {value: 50};
+    if(!keys.includes('savedLatencyThreshold')) storage.set('savedLatencyThreshold', latencyThreshold);
+
     createWindow()
   });
 
@@ -168,11 +171,43 @@ app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit()
 })
 
-async function fetchWorlds() {
+function med(arr) {
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 !== 0 ? s[m] : (s[m - 1] + s[m]) /2;
+}
+
+async function fetchWorlds(mainWindow, worlds) {
+  if(lastWorldUpdate && Date.now() - lastWorldUpdate < 5000) return worlds;
+  lastWorldUpdate = Date.now();
   try {
     const res = await fetch('https://2004.losthq.rs/pages/api/worlds.php');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const worldsData = await res.json();
+
+    //get latency for all worlds
+    for(let server of worldsData){
+      server.ms = performance.now();
+      await fetch(lowMem.value?server.ld:server.hd, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' });
+      server.ms = Math.ceil(performance.now() - server.ms);
+    }
+    
+    //compare current world ping to history to determine spike
+    const currentWorldPing = worldsData.find(s => s.world == currentWorld).ms;
+    let spike = false;
+    if(latencyThreshold.value !== false){
+      const max_history = 20;
+      if(pingHistory.length >= max_history/2){
+        const baseline = med(pingHistory);
+        const percentDiff = ((currentWorldPing - baseline) / baseline) * 100;
+        if(percentDiff > latencyThreshold.value) spike = true;
+      }
+      pingHistory.push(currentWorldPing);
+      if(pingHistory.length > max_history) pingHistory.shift();
+    }
+    mainWindow.webContents.send('client-message', {pingUpdate: currentWorldPing, spike});
+
+    return worldsData;
   } catch (err) {
     console.error('Failed to fetch worlds:', err);
     return [];
@@ -246,15 +281,16 @@ function sendClientLogin(mainWindow, username, encryptedPassword) {
 
 //build menu
 async function createAppMenu(mainWindow) {
-  worlds = await fetchWorlds();
+  worlds = await fetchWorlds(mainWindow,worlds);
   currentWorld = storage.getSync('savedWorld');
   lowMem = storage.getSync('savedLowMem');
   idleTimer = storage.getSync('savedIdleTimer');
   sessionTimer = storage.getSync('savedSessionTimer');
   accounts = storage.getSync('savedAccounts');
+  latencyThreshold = storage.getSync('savedLatencyThreshold');
 
   let worldMenu = [{label: "Players Online: " + worlds.reduce((sum, w) => sum + w.count, 0), disabled: true},...worlds.map(world => ({
-    label: `World ${world.world} ${world.location} (${world.p2p? 'P2P' : 'F2P'}) (${world.count} players)`,
+    label: `World ${world.world} ${world.location} - ${world.ms}ms - ${world.p2p? 'P2P' : 'F2P'} - ${world.count} players`,
     type: 'radio',
     checked: world.world === currentWorld,
     click: () => {
@@ -268,6 +304,7 @@ async function createAppMenu(mainWindow) {
           mainWindow.loadURL(lowMem.value?world.ld:world.hd);
           mainWindow.title = defaultTitle + `  |  World ${world.world} ${world.location}`;
           createAppMenu(mainWindow);
+          pingHistory = [];
         });
       }
 
@@ -292,6 +329,7 @@ async function createAppMenu(mainWindow) {
         mainWindow.webContents.send('client-message', {statusMessage: `Switching to ${lm===1?'Low':'High'} Detail...`});
         mainWindow.loadURL(mainWindow.webContents.getURL().replace(/lowmem=(\d)/, `lowmem=${lm}`));
         createAppMenu(mainWindow);
+        pingHistory = [];
       });
     }
 
@@ -402,7 +440,24 @@ async function createAppMenu(mainWindow) {
               mainWindow.webContents.send('client-message', {SessionTimer: option.value});
             });
           }
-        }))}
+        }))},
+        { label: 'Latency Spike Warnings', submenu:[
+          { label: 'Off', value: false },
+          { label: '+50% threshold', value: 50 },
+          { label: '+75% threshold', value: 75 },
+          { label: '+100% threshold', value: 100 },
+        ].map(option => ({
+            label: option.label,
+            type: 'radio',
+            checked: latencyThreshold.value === option.value,
+            click: () => {
+              latencyThreshold = { value: option.value };
+
+              storage.set('savedLatencyThreshold', latencyThreshold, function (error) {
+                if (error) throw error;
+              });
+            }
+        }))},
       ]
     },
     {

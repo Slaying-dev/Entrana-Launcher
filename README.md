@@ -1,12 +1,13 @@
 ## Entrana Launcher for Lost City
 Goal for the project is a minimalist launcher for Lost City with a few important features to make life in 2004 more enjoyable.
 
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/835e64d5-decb-4bb0-87c1-b448d72f4aa8" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/4d06b74b-22bf-4945-a8f4-f929a68cc967" />
 
 
 ### Launcher Features
 - [90 Second Idle Timer with notifications](#session-timer-and-idle-timer)
 - [Session Timer in either Game Ticks or Real Time](#session-timer-and-idle-timer)
+- [Latency Spike Warnings](#latency-spike-warnings)
 - [Account manager with local encrypted password storage](#account-manager---1-click-login)
 - [World Select with player count and region](#world-select)
 - [Built in World Map](#world-map)
@@ -28,7 +29,7 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 
 ### Session Timer and Idle Timer
 
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/1df62f4e-09d7-4f98-b030-003c56309770" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/cc802552-35b9-425c-a925-5dc24b347c7c" />
 
 
 ### Account Manager - 1 click login
@@ -41,7 +42,13 @@ Idea taken from [this post](https://www.reddit.com/r/2004lostcityrs/comments/1mv
 
 ### World Select
 
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/07aa0c0a-b3bd-4d33-beee-bd0c298369b1" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/85473798-6838-4a6c-8d5d-8dc19f11d407" />
+
+
+### Latency Spike Warnings
+Set your threshold in Options or turn off the warning
+
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/e8be1f56-7259-4157-a5fc-b62e443265d9" />
 
 
 ### World Map
@@ -51,7 +58,7 @@ Idea taken from [this post](https://www.reddit.com/r/2004lostcityrs/comments/1mv
 
 ### Other Options
 
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/bd9cf14d-144c-44fa-b5d7-3b277cdd7225" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/cd1cc6bd-12e3-4561-8664-0b2a1aca6fbb" />
 
 
 ### Safe Logout Warnings

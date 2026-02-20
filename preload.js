@@ -270,6 +270,13 @@ window.addEventListener('DOMContentLoaded', () => {
         }, sessionTime == 'ticks'?600:1000);
     }
 
+    //latency display
+    const latencyDisplay = document.createElement('div');
+    latencyDisplay.classList.add('latency', 'status-right');
+    latencyDisplay.textContent = '0ms';
+    latencyDisplay.title = 'Current world latency';
+    statusBarFrame.appendChild(latencyDisplay);
+
     //listen for messages from main process
     ipcRenderer.on('client-message', function (event, message) {
         if(message.IdleTimer !== undefined){
@@ -307,6 +314,15 @@ window.addEventListener('DOMContentLoaded', () => {
                     else window._tinyMidiVolume(0);
                 }
             }, 100)
+        }
+        if(message.pingUpdate !== undefined){
+            latencyDisplay.style.display = message.latencyDisplay!==false?'block':'none';
+            latencyDisplay.textContent = `${message.pingUpdate}ms`;
+            if(message.spike){
+                updateStatusMessage('Latency spike over threshold!');
+                latencyDisplay.classList.add('flash');
+                setTimeout(()=> latencyDisplay.classList.remove('flash') , 5000)
+            }
         }
     });
 
