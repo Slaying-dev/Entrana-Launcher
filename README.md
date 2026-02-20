@@ -45,3 +45,5 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 
 
 ### Safe Logout Warnings
+
+<img width="456" height="292" alt="image" src="https://github.com/user-attachments/assets/c5c3e6bb-518b-4a2f-b333-6f3a07102094" />
