@@ -32,7 +32,7 @@ function createWindow () {
 
   let mainWindowState = windowStateKeeper({
     defaultWidth: 800,
-    defaultHeight: 580
+    defaultHeight: 608
   });
 
   const mainWindow = new BrowserWindow({
@@ -55,9 +55,10 @@ function createWindow () {
   setInterval(() => createAppMenu(mainWindow), 10 * 1000); //update player counts
 
   ipcMain.on('resize-to-client', (event, windowHeight, canvasHeight) => {
-    var size = mainWindow.getSize();
-    let offset_win = windowHeight - canvasHeight;
-    mainWindow.setSize(size[0], size[1]-offset_win);
+    const statusBarHeight = 28;
+    const size = mainWindow.getSize();
+    const offset_win = windowHeight - canvasHeight;
+    mainWindow.setSize(size[0], (size[1]-offset_win)+statusBarHeight);
   });
 
   //send stored settings to client on request
@@ -92,6 +93,8 @@ function createWindow () {
 }
 
 function createMapWindow(parentWindow) {
+    parentWindow.webContents.send('client-message', {statusMessage: `Opening world map...`, timeout: 2000});
+
     if (mapWindow) {
         mapWindow.focus();
         return;
@@ -212,7 +215,8 @@ function addUpdateAccountPrompt(mainWindow,username) {
 //create/update/delete account & store encrypted password, then update menu
 function updateAccount(mainWindow, username, password, deleteOnly = false) {
   let accounts = storage.getSync('savedAccounts');
-  if(accounts[username]) delete accounts[username];
+  let exists = accounts[username] !== undefined;
+  if(exists) delete accounts[username];
 
   if(!deleteOnly){
     const encryptedBuffer = safeStorage.encryptString(password);
@@ -223,6 +227,7 @@ function updateAccount(mainWindow, username, password, deleteOnly = false) {
   storage.set('savedAccounts', accounts, function(error) {
     if (error) throw error;
     createAppMenu(mainWindow);
+    mainWindow.webContents.send('client-message', {statusMessage: `Account ${username} ${deleteOnly?'removed':(exists?'updated':'added')}...`});
   });
 }
 
@@ -231,6 +236,7 @@ function sendClientLogin(mainWindow, username, encryptedPassword) {
   const bufferToDecrypt = Buffer.from(encryptedPassword, 'latin1');
   const decryptedPassword = safeStorage.decryptString(bufferToDecrypt);
   mainWindow.webContents.send('client-login', { username, decryptedPassword });
+  mainWindow.webContents.send('client-message', {statusMessage: `Logging in as ${username}...`});
 }
 
 //build menu
@@ -253,7 +259,7 @@ async function createAppMenu(mainWindow) {
         currentWorld = world.world;
         storage.set('savedWorld', currentWorld, function(error) {
           if (error) throw error;
-          mainWindow.webContents.send('client-message', {alertMessage: `Switching to World ${world.world}`});
+          mainWindow.webContents.send('client-message', {statusMessage: `Switching to World ${world.world}...`});
           mainWindow.loadURL(lowMem.value?world.ld:world.hd);
           mainWindow.title = defaultTitle + `  |  World ${world.world} ${world.location}`;
           createAppMenu(mainWindow);
@@ -278,7 +284,7 @@ async function createAppMenu(mainWindow) {
       lowMem = {value: lm===1?true:false};
       storage.set('savedLowMem', lowMem, function(error) {
         if (error) throw error;
-        mainWindow.webContents.send('client-message', {alertMessage: `Switching to ${lm===1?'Low':'High'} Detail`});
+        mainWindow.webContents.send('client-message', {statusMessage: `Switching to ${lm===1?'Low':'High'} Detail...`});
         mainWindow.loadURL(mainWindow.webContents.getURL().replace(/lowmem=(\d)/, `lowmem=${lm}`));
         createAppMenu(mainWindow);
       });
@@ -411,6 +417,7 @@ async function createAppMenu(mainWindow) {
           fs.writeFile(path.join(screenshots, `screenshot-${Date.now()}.png`), image.toPNG(), (err) => {
             if (err) throw err
             mainWindow.webContents.send('client-message', {'playScreenshotAudio': true});
+            mainWindow.webContents.send('client-message', {statusMessage: `Screenshot saved!`, timeout: 2000});
           })
         })
       }
@@ -423,7 +430,9 @@ async function createAppMenu(mainWindow) {
         { label: 'Open Dev Tools', role: 'toggleDevTools', accelerator: '' },
         { type:  'separator' },
         { label: 'Lost City Website', click: () => { shell.openExternal('https://2004.lostcity.rs/'); } },
-        { label: 'Project Github', click: () => { shell.openExternal('https://github.com/Slaying-dev/Entrana-Launcher'); } }
+        { label: 'Project Github', click: () => { shell.openExternal('https://github.com/Slaying-dev/Entrana-Launcher'); } },
+        { type:  'separator' },
+        { label: 'Version ' + app.getVersion(), enabled: false }
       ]
     }
   ];
