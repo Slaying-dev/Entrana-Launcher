@@ -1,7 +1,7 @@
 ## Entrana Launcher for Lost City
 Goal for the project is a minimalist launcher for Lost City with a few important features to make life in 2004 more enjoyable.
 
-<img width="1351" height="979" alt="image" src="https://github.com/user-attachments/assets/835e64d5-decb-4bb0-87c1-b448d72f4aa8" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/835e64d5-decb-4bb0-87c1-b448d72f4aa8" />
 
 
 ### Launcher Features
