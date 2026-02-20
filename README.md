@@ -1,10 +1,13 @@
 ## Entrana Launcher for Lost City
 
-Goal for the project is to make a dead simple, minimalist launcher for Lost City. No traditional runescape client sidebars, no popup windows. Everything you need, and nothing you don't in the menu bar.
+Goal for the project is a minimalist launcher for Lost City with a few important features to make life in 2004 more enjoyable.
 
+- Account manager with local encrypted password storage
+- Built in World Map
 - 90 Second Idle Timer with notifications
 - Session Timer in either Game Ticks or Real Time
 - Detail select
+- Login screen music toggle
 - World Select with player count and region
 - Screenshots
 - Warnings for changing detail, world, or closing the launcher if you are currently logged in.
