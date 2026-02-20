@@ -77,6 +77,11 @@ function createWindow () {
     event.preventDefault();
   });
 
+  //disable history
+  mainWindow.webContents.on('update-target-url', () => {
+    mainWindow.webContents.navigationHistory.clear();
+  })
+
   //warn user before closing if they are logged in
   mainWindow.on('close', function(e){
     if(loginStatus == true){
