@@ -19,8 +19,9 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 
 ### Build from source
 1. ```git clone https://github.com/Slaying-dev/Entrana-Launcher.git```
-1. ```npm install```
-2. ```npm run make```
+2. ```npm install```
+3. ```npm run make```
+4. linux users may need to supply their [environment password manager](https://www.electronjs.org/docs/latest/api/safe-storage#safestoragegetselectedstoragebackend-linux) in order to utilize the account manager
 
 ### Download the latest prebuilt release
 - [Latest Release](https://github.com/Slaying-dev/Entrana-Launcher/releases/latest)
