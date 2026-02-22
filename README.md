@@ -9,6 +9,7 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 - [Session Timer in either Game Ticks or Real Time](#session-timer-and-idle-timer)
 - [Latency Spike Warnings](#latency-spike-warnings)
 - [Account manager with local encrypted password storage](#account-manager---1-click-login)
+- [Keybinds & screenshot save directory editor](#bindings-editor)
 - [World Select with player count and region](#world-select)
 - [Built in World Map](#world-map)
 - [Login screen music toggle](#other-options)
@@ -34,11 +35,17 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 
 
 ### Account Manager - 1 click login
-Idea taken from [this post](https://www.reddit.com/r/2004lostcityrs/comments/1mvupbs/tampermonkey_autofill_for_rs2004_login/)
+Also saves your previously logged in account and allows you to set a keybind to quickly login with the last account you used. Original idea for saved login details taken from [this post](https://www.reddit.com/r/2004lostcityrs/comments/1mvupbs/tampermonkey_autofill_for_rs2004_login/)
 
 <img width="100%" alt="image" src="https://github.com/user-attachments/assets/4f24385f-25d8-4930-a503-4ec968642e6b" />
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/751e43ab-0e29-45b0-8e7c-9ece99e73bbf" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/50e9fe6e-6335-47e6-b130-780860550ab1" />
 <img width="100%" alt="image" src="https://github.com/user-attachments/assets/0de35eb5-2ab5-47cc-b12e-5d0aef540599" />
+
+
+### Bindings Editor
+Edit your bound screenshot save folder and assigned bound keys
+
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/df19687f-1bd9-4e9f-9859-9db075eeaf21" />
 
 
 ### World Select
