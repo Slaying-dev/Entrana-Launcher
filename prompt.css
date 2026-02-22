@@ -72,6 +72,9 @@ h2 > .label-desc
     font-size: 0.95rem;
     padding-bottom: 0px;
     font-weight: 200;
+}
+
+#data-container.account-form > label {
     display: none !important;
 }
 
@@ -199,12 +202,6 @@ select#data {
     filter: brightness(1.1);
 }
 
-
-
-
-
-
-
 #ok:hover, #ok:focus,
 #custom:hover, #custom:focus
 #cancel:hover, #cancel:focus {
@@ -247,16 +244,20 @@ option {
     background-color: #07070C;
 }
 
-div.keybind {
+div.keybind, div.dir-container {
     display: grid;
-    grid-template-columns: max-content max-content max-content;
+    grid-template-columns: minmax(0, 1fr) max-content;
     row-gap: 20px;
     column-gap: 10px;
-    margin: auto 0;
+    margin: 0 0 1.2em;
     justify-content: center;
 }
 
-div.keybind button {
+div.keybind:last-of-type{
+    margin-bottom: 0 !important;
+}
+
+div.keybind button, div.dir-container button {
     width: auto;
 }
 
@@ -315,8 +316,17 @@ div.keybind label:after {
     font-weight: 100;
 }
 
+.keybindData, input[type='directoryChoose'] {
+    margin-bottom: 0 !important;
+}
+
+input[type='directoryChoose'] {
+    margin-bottom: 0 !important;
+    color: oklch(from currentColor calc(l - 0.4) c h) !important;
+}
+
 @media(prefers-color-scheme: dark){
-    #data, .keybindData
+    #data, .keybindData, .btn-clear, .btn-browse
     {
         background: rgb(50 50 50);
         color: #fff;
@@ -325,12 +335,25 @@ div.keybind label:after {
 }
 
 @media(prefers-color-scheme: light){
-    #data, .keybindData
+    #data, .keybindData, .btn-clear, .btn-browse
     {
         background: rgb(226, 226, 226);
         color: #000;
         border: 1px solid rgb(200, 200, 200);
     }
+}
+
+.btn-clear, .btn-browse{
+    font-size: 2em;
+    line-height: 0;
+    border-radius: 2px;
+    cursor: pointer;
+    color: oklch(from currentColor calc(l - 0.5) c h);
+}
+
+.btn-browse{
+    font-size:1.4em !important;
+    color: oklch(from currentColor calc(l - 0.3) c h) !important;
 }
 
 .password-field
@@ -348,7 +371,7 @@ div.keybind label:after {
     border-radius: 0;
 }
 
-#data:hover
+#data:hover, .btn-clear:hover, .btn-browse:hover
 {
     border: 1px solid rgb(85, 85, 85);
 }
@@ -371,4 +394,8 @@ div.keybind label:after {
     margin-top: -1em;
     margin-bottom: 1em;
     font-style: italic;
+}
+
+.has-conflict {
+  border-color: hsl(5, 75%, 44%) !important;
 }

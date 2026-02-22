@@ -154,7 +154,7 @@ WebSocket.prototype.send = function(...args) {
 
 //add client global for login functionality
 //idea taken from https://pastebin.com/aHD2scKV tampermonkey login script by LR2004
-var observer = new MutationObserver(function(mutations) {
+const observer = new MutationObserver(function(mutations) {
   mutations.forEach(function(mutation) {
     mutation.addedNodes.forEach(function(addedNode) {
         if(addedNode.nodeName === 'HEAD'){
@@ -278,25 +278,19 @@ window.addEventListener('DOMContentLoaded', () => {
     statusBarFrame.appendChild(latencyDisplay);
 
     //listen for messages from main process
-    ipcRenderer.on('client-message', function (event, message) {
-        if(message.IdleTimer !== undefined){
-            idleTimer.style.display = message.IdleTimer!==false?'block':'none';
-            idleWarn = message.IdleTimer;
+    ipcRenderer.on('client-message', function (_, message) {
+        if(message.idleTimer !== undefined && message.idleTimer !== idleWarn){
+            idleTimer.style.display = message.idleTimer!==false?'block':'none';
+            idleWarn = message.idleTimer;
         }
-        if(message.SessionTimer !== undefined){
+        if(message.sessionTimer !== undefined && message.sessionTimer !== sessionTime){
             sessionTimer.innerText = '';
-            sessionTimer.style.display = message.SessionTimer!==false?'block':'none';
-            sessionTime = message.SessionTimer;
+            sessionTimer.style.display = message.sessionTimer!==false?'block':'none';
+            sessionTime = message.sessionTimer;
             startSessionTimer();
         }
-        if(message.playScreenshotAudio !== undefined){
-            screenshotAudio.play();
-        }
-        if(message.statusMessage !== undefined){
-            updateStatusMessage(message.statusMessage, message.timeout);
-        }
-        if(message.LoginMusic !== undefined){
-            loginMusic = message.LoginMusic;
+        if(message.loginMusic !== undefined && message.loginMusic !== loginMusic){
+            loginMusic = message.loginMusic;
             const interval = setInterval(() => {
                 if (typeof window._tinyMidiVolume === 'function') {
                     clearInterval(interval);
@@ -310,10 +304,16 @@ window.addEventListener('DOMContentLoaded', () => {
                         midiOnce = true;
                     }
                     
-                    if (message.LoginMusic) window._tinyMidiVolume(Math.pow(10, -4 / 20));
+                    if (message.loginMusic) window._tinyMidiVolume(Math.pow(10, -4 / 20));
                     else window._tinyMidiVolume(0);
                 }
             }, 100)
+        }
+        if(message.playScreenshotAudio !== undefined){
+            screenshotAudio.play();
+        }
+        if(message.statusMessage !== undefined){
+            updateStatusMessage(message.statusMessage, message.timeout);
         }
         if(message.pingUpdate !== undefined){
             latencyDisplay.style.display = message.latencyDisplay!==false?'block':'none';

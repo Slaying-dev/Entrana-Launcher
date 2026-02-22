@@ -1,31 +1,43 @@
-const { app, BrowserWindow, ipcMain, Menu, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, shell, safeStorage, globalShortcut, dialog } = require('electron');
 const path = require('node:path')
 const os = require('os');
 const fs = require('fs');
 const storage = require('electron-json-storage');
 const windowStateKeeper = require('electron-window-state');
-const prompt = require('electron-plugin-prompts');
+const Prompt = require('electron-plugin-prompts');
 
-//establish storage path for settings and screenshots
+//establish storage path for settings - may want to make this a setting?
 let storagePath = path.join(os.tmpdir(), 'EntranaLauncher');
 if (!fs.existsSync(storagePath)) fs.mkdirSync(storagePath);
 storage.setDataPath(storagePath);
-let screenshots = path.join(os.tmpdir(), 'EntranaLauncher', 'Screenshots');
-if (!fs.existsSync(screenshots)) fs.mkdirSync(screenshots);
 
 const defaultTitle = "Entrana  |  Lost City Launcher";
-let worlds = [], loginStatus = false, accounts = {}, currentWorld, lowMem, idleTimer, sessionTimer, loginMusic, mapWindow, latencyThreshold, lastWorldUpdate, pingHistory = [];
+let mainWindow, mapWindow, worlds = [], loginStatus = false, accounts = {}, settings = {}, lastWorldUpdate = 0, pingHistory = [], pkg = { lastcall:0 }, registeredShortcuts = {};
+
+const settingDefaults = {
+  world : '2',
+  lowMem : false,
+  idleTimer : 10,
+  sessionTimer : 'time',
+  loginMusic : true,
+  latencyThreshold : 50,
+  screenshotsPath : path.join(storagePath, 'Screenshots'),
+  kb_screenshot : 'Ctrl+PrintScreen',
+  kb_quickLogin : 'Home',
+  kb_worldMap : 'Ctrl+M',
+  kb_refresh : 'Ctrl+Shift+Alt+R' //want this default to be hard to accidentally press since it purposely doesnt check for login
+}
 
 const warningDefaults = {
-    title: 'Warning',
-    label: '',
-    icon: path.join(__dirname, 'icon.ico'),
-    buttonLabels:{ok:'Continue', cancel:'Cancel'},
-    width: 400,
-    menuBarVisible: false,
-    customStylesheet: path.join(__dirname, 'prompt.css'),
-    inputAttrs: {type: 'hidden'},
-    type: 'input'
+  title: 'Warning',
+  label: '',
+  icon: path.join(__dirname, 'icon.ico'),
+  buttonLabels:{ok:'Continue', cancel:'Cancel'},
+  width: 400,
+  menuBarVisible: false,
+  customStylesheet: path.join(__dirname, 'prompt.css'),
+  inputAttrs: {type: 'hidden'},
+  type: 'input'
 }
 
 function createWindow () {
@@ -35,26 +47,28 @@ function createWindow () {
     defaultHeight: 608
   });
 
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     x: mainWindowState.x,
     y: mainWindowState.y,
     width: mainWindowState.width,
     height: mainWindowState.height,
+    backgroundColor: '#000000',
     title: defaultTitle,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: false,
+      backgroundThrottling: false
     }
   })
 
   mainWindowState.manage(mainWindow);
 
-  mainWindow.loadURL(`https://w${currentWorld}-2004.lostcity.rs/rs2.cgi?plugin=0&world=${currentWorld}&lowmem=${lowMem.value?1:0}`);
+  mainWindow.loadURL(`https://w${settings.world}-2004.lostcity.rs/rs2.cgi?plugin=0&world=${settings.world}&lowmem=${settings.lowMem?1:0}`);
 
-  createAppMenu(mainWindow);
-  setInterval(() => createAppMenu(mainWindow), 10 * 1000); //update player counts
+  createAppMenu();
+  setInterval(() => createAppMenu(), 10*1000); //update player counts/latency
 
-  ipcMain.on('resize-to-client', (event, windowHeight, canvasHeight) => {
+  ipcMain.on('resize-to-client', (_, windowHeight, canvasHeight) => {
     const statusBarHeight = 28;
     const size = mainWindow.getSize();
     const offset_win = windowHeight - canvasHeight;
@@ -62,15 +76,19 @@ function createWindow () {
   });
 
   //send stored settings to client on request
-  ipcMain.on('send-stored-values', (event) => {
-    mainWindow.webContents.send('client-message', {'IdleTimer': idleTimer.value});
-    mainWindow.webContents.send('client-message', {'SessionTimer': sessionTimer.value});
-    mainWindow.webContents.send('client-message', {'LoginMusic': loginMusic.value});
+  ipcMain.on('send-stored-values', () => {
+    mainWindow.webContents.send('client-message', settings);
   });
 
-  ipcMain.on('client-logged-in', (event, loggedIn) => {
+  ipcMain.on('client-logged-in', (_, loggedIn) => {
     loginStatus = loggedIn;
-    createAppMenu(mainWindow);
+    createAppMenu();
+  });
+
+  ipcMain.on('prompt-for-directory', async(_, {name, current}) => {
+    const win = BrowserWindow.getFocusedWindow();
+    const res = await dialog.showOpenDialog(win, {defaultPath: current, properties: ['openDirectory'] });
+    win.webContents.send('update-directory', {name: name, dir: res.canceled ? false : res.filePaths[0]});
   });
 
   mainWindow.on('page-title-updated', (event) => {
@@ -83,9 +101,9 @@ function createWindow () {
   })
 
   //warn user before closing if they are logged in
-  mainWindow.on('close', function(e){
+  mainWindow.on('close', (e) => {
     if(loginStatus == true){
-      prompt({...warningDefaults,
+      Prompt({...warningDefaults,
         description : 'You are currently logged in! Closing the launcher now will not log you out for 60 seconds. Are you sure you want to continue?'
       },mainWindow)
       .then((r) => {
@@ -95,81 +113,185 @@ function createWindow () {
     }
   });
 
+  //register keybinds
+  registerUpdateShortcut('kb_screenshot',settings.kb_screenshot, takeScreenshot);
+  registerUpdateShortcut('kb_worldMap',settings.kb_worldMap, createMapWindow);
+  registerUpdateShortcut('kb_refresh',settings.kb_refresh, () => {
+    mainWindow.loadURL(mainWindow.webContents.getURL());
+  });
+  registerUpdateShortcut('kb_quickLogin',settings.kb_quickLogin, () => {
+    if(accounts.lastLogin && accounts[accounts.lastLogin] && loginStatus==false){
+      sendClientLogin(accounts.lastLogin, accounts[accounts.lastLogin])
+    }
+  });
+
 }
 
-function createMapWindow(parentWindow) {
-    parentWindow.webContents.send('client-message', {statusMessage: `Opening world map...`, timeout: 2000});
+function createMapWindow() {
+  
+  if (mapWindow) {
+    mapWindow.close()
+    return;
+  }
 
-    if (mapWindow) {
-        mapWindow.focus();
-        return;
-    }
+  mainWindow.webContents.send('client-message', {statusMessage: `Opening world map...`, timeout: 2000});
 
-    mapWindow = new BrowserWindow({
-        title: 'World Map',
-        width: 650,
-        height: 542,
-        parent: parentWindow,
-        resizable: false,
-        menuBarVisible: false,
-        modal: false,
-        show: false,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload-map.js')
-        }
-    });
+  mapWindow = new BrowserWindow({
+      title: 'World Map',
+      width: 650,
+      height: 542,
+      parent: mainWindow,
+      resizable: false,
+      menuBarVisible: false,
+      backgroundColor: '#000000',
+      modal: false,
+      show: true,
+      webPreferences: {
+          preload: path.join(__dirname, 'preload-map.js'),
+          contextIsolation: false
+      }
+  });
 
-    mapWindow.loadURL('https://2004.lostcity.rs/worldmap');
-    mapWindow.setMenu(null);
+  mapWindow.loadURL('https://2004.lostcity.rs/worldmap');
+  mapWindow.setMenu(null);
 
-    mapWindow.once('ready-to-show', () => {
-        mapWindow.show();
-    });
+  mapWindow.on('closed', () => {
+      mapWindow = null;
+  });
 
-    mapWindow.on('closed', () => {
-        mapWindow = null;
-    });
-
-    mapWindow.on('page-title-updated', (event) => {
-      event.preventDefault();
-    });
+  mapWindow.on('page-title-updated', (event) => {
+    event.preventDefault();
+  });
 }
 
 app.whenReady().then(() => {
 
-  //initialize settings if not already set
-  storage.keys(function(error, keys) {
+  //load stored data and set defaults
+  accounts = storage.getSync('savedAccounts');
+  settings = {...settingDefaults, ...storage.getSync('savedSettings')};
+  storage.set('savedSettings', settings, (error) => {
     if (error) throw error;
-
-    currentWorld = keys.includes('savedWorld') ? storage.getSync('savedWorld') : '2';
-    if(!keys.includes('savedWorld')) storage.set('savedWorld', currentWorld);
-
-    lowMem = keys.includes('savedLowMem') ? storage.getSync('savedLowMem') : {value: false};
-    if(!keys.includes('savedLowMem')) storage.set('savedLowMem', lowMem);
-
-    idleTimer = keys.includes('savedIdleTimer') ? storage.getSync('savedIdleTimer') : {value: 10};
-    if(!keys.includes('savedIdleTimer')) storage.set('savedIdleTimer', idleTimer);
-
-    sessionTimer = keys.includes('savedSessionTimer') ? storage.getSync('savedSessionTimer') : {value: 'time'};
-    if(!keys.includes('savedSessionTimer')) storage.set('savedSessionTimer', sessionTimer);
-
-    loginMusic = keys.includes('savedLoginMusic') ? storage.getSync('savedLoginMusic') : {value: true};
-    if(!keys.includes('savedLoginMusic')) storage.set('savedLoginMusic', loginMusic);
-
-    latencyThreshold = keys.includes('savedLatencyThreshold') ? storage.getSync('savedLatencyThreshold') : {value: 50};
-    if(!keys.includes('savedLatencyThreshold')) storage.set('savedLatencyThreshold', latencyThreshold);
-
-    createWindow()
+    createWindow();
   });
 
-  app.on('activate', function () {
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-app.on('window-all-closed', function () {
+app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
+
+function registerUpdateShortcut(name, accelerator, callback){
+  if(accelerator && accelerator.length && globalShortcut.isRegistered(accelerator)){
+    //already taken
+  }else{
+    if(registeredShortcuts[name] && registeredShortcuts[name].accelerator) globalShortcut.unregister(registeredShortcuts[name].accelerator);
+
+    callback = callback || registeredShortcuts[name].callback;
+    accelerator = accelerator || (accelerator==''?'':registeredShortcuts[name].accelerator);
+
+    if(accelerator.length){ //if accelerator blank, unregister previous but dont register the blank shortcut
+      let r = globalShortcut.register(accelerator, callback);
+      if(!r) console.log(`error registering shortcut '${name}' to '${accelerator}'`);
+      else registeredShortcuts[name] = {callback, accelerator};
+    } else registeredShortcuts[name] = {callback, accelerator};
+  }
+}
+
+function restoreAllBindings(){
+  Object.keys(registeredShortcuts).forEach((binding) => {
+    registerUpdateShortcut(binding, settings[binding])
+  })
+}
+
+function openSettingsPrompt(){
+  //disable keybinds while settings open
+  globalShortcut.unregisterAll();
+
+  //need to register PrintScreen globally while bindings window is open so that we can use it on windows, theres probably a better way to do this
+  let allPSlol = ['PrintScreen','CommandOrControl+PrintScreen','Shift+PrintScreen','Alt+PrintScreen','CommandOrControl+Shift+PrintScreen','CommandOrControl+Alt+PrintScreen','CommandOrControl+Shift+Alt+PrintScreen','Shift+Alt+PrintScreen'];
+  globalShortcut.registerAll(allPSlol, () => {
+    BrowserWindow.getFocusedWindow().webContents.send('force-event', 'PrintScreen');
+  });
+
+  Prompt({
+    title: 'Edit Bindings',
+    label: '',
+    icon: './icon.ico',
+    buttonLabels:{ok:'Update Bindings', cancel:'Cancel'},
+    width: 400,
+    height: 500,
+    menuBarVisible: false,
+    customStylesheet: path.join(__dirname, 'prompt.css'),
+    customScript: path.join(__dirname, 'prompt-settings.js'),
+    type: 'multiInput',
+    multiInputOptions: [{
+      label: 'Screenshot Save Directory',
+      value: settings.screenshotsPath,
+      inputAttrs: {
+        type: 'directoryChoose',
+        name: 'screenshotDir'
+      }
+    },{
+      label: 'Screenshot Keybind',
+      value: settings.kb_screenshot,
+      inputAttrs: {
+        type: 'keybind',
+        name: 'kb_screenshot'
+      }
+    },{
+      label: 'Quick Login Keybind',
+      value: settings.kb_quickLogin,
+      inputAttrs: {
+        type: 'keybind',
+        name: 'kb_quickLogin'
+      }
+    },{
+      label: 'World Map Keybind',
+      value: settings.kb_worldMap,
+      inputAttrs: {
+        type: 'keybind',
+        name: 'kb_worldMap'
+      }
+    },{
+      label: 'Reload Client Keybind',
+      value: settings.kb_refresh,
+      inputAttrs: {
+        type: 'keybind',
+        name: 'kb_refresh'
+      }
+    }]
+  },mainWindow)
+  .then((r) => {
+      //unregister all those PrintScreen globals again
+      globalShortcut.unregisterAll();
+
+      //update bindings and restore
+      if(r === null) restoreAllBindings();
+      else {
+        settings = {...settings, ...{
+          screenshotsPath: r[0],
+          kb_screenshot: r[1].replaceAll( ' ', '' ),
+          kb_quickLogin: r[2].replaceAll( ' ', '' ),
+          kb_worldMap: r[3].replaceAll( ' ', '' ),
+          kb_refresh: r[4].replaceAll( ' ', '' )
+        }};
+
+        storage.set('savedSettings', settings, (error) => {
+          if (error) throw error;
+          restoreAllBindings();
+          mainWindow.webContents.send('client-message', {statusMessage: `Bindings updated...`, timeout: 1000});
+          createAppMenu();
+        });        
+      }
+  }).catch(console.error);
+}
 
 function med(arr) {
   const s = [...arr].sort((a, b) => a - b);
@@ -177,7 +299,7 @@ function med(arr) {
   return s.length % 2 !== 0 ? s[m] : (s[m - 1] + s[m]) /2;
 }
 
-async function fetchWorlds(mainWindow, worlds) {
+async function fetchWorlds(worlds) {
   if(lastWorldUpdate && Date.now() - lastWorldUpdate < 5000) return worlds;
   lastWorldUpdate = Date.now();
   try {
@@ -188,19 +310,19 @@ async function fetchWorlds(mainWindow, worlds) {
     //get latency for all worlds
     for(let server of worldsData){
       server.ms = performance.now();
-      await fetch(lowMem.value?server.ld:server.hd, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' });
+      await fetch(settings.lowMem?server.ld:server.hd, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' });
       server.ms = Math.ceil(performance.now() - server.ms);
     }
     
     //compare current world ping to history to determine spike
-    const currentWorldPing = worldsData.find(s => s.world == currentWorld).ms;
+    const currentWorldPing = worldsData.find(s => s.world == settings.world).ms;
     let spike = false;
-    if(latencyThreshold.value !== false){
+    if(settings.latencyThreshold !== false){
       const max_history = 20;
       if(pingHistory.length >= max_history/2){
         const baseline = med(pingHistory);
         const percentDiff = ((currentWorldPing - baseline) / baseline) * 100;
-        if(percentDiff > latencyThreshold.value) spike = true;
+        if(percentDiff > settings.latencyThreshold) spike = true;
       }
       pingHistory.push(currentWorldPing);
       if(pingHistory.length > max_history) pingHistory.shift();
@@ -214,9 +336,20 @@ async function fetchWorlds(mainWindow, worlds) {
   }
 }
 
+//get current version
+async function fetchPKG() {
+  if(pkg.lastcall && Date.now() - pkg.lastcall < (1000*60*10)) return pkg;
+  pkg.lastcall = Date.now();
+  let res = await fetch('https://raw.githubusercontent.com/Slaying-dev/Entrana-Launcher/master/package.json')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  data.lastcall = pkg.lastcall;
+  return data
+}
+
 //shows username/password prompt for adding/updating accounts, then calls updateAccount to save changes
-function addUpdateAccountPrompt(mainWindow,username) {
-  prompt({
+function addUpdateAccountPrompt(username) {
+  Prompt({
     title: username?'Update Account':'Add Account',
     label: '',
     icon: './icon.ico',
@@ -225,7 +358,7 @@ function addUpdateAccountPrompt(mainWindow,username) {
     height: 260,
     menuBarVisible: false,
     customStylesheet: path.join(__dirname, 'prompt.css'),
-    customScript: path.join(__dirname, 'prompt.js'),
+    customScript: path.join(__dirname, 'prompt-account.js'),
     type: 'multiInput',
     multiInputOptions: [{
       label: 'Username',
@@ -233,7 +366,8 @@ function addUpdateAccountPrompt(mainWindow,username) {
       inputAttrs: {
         type: 'text',
         required: true,
-        placeholder: 'Username'
+        placeholder: 'Username',
+        class: 'username-field'
       }
     },
     {
@@ -248,12 +382,12 @@ function addUpdateAccountPrompt(mainWindow,username) {
   },mainWindow)
   .then((r) => {
       if(r === null) console.log('user cancelled');
-      else updateAccount(mainWindow, r[0], r[1])
+      else updateAccount(r[0], r[1])
   }).catch(console.error);
 }
 
 //create/update/delete account & store encrypted password, then update menu
-function updateAccount(mainWindow, username, password, deleteOnly = false) {
+function updateAccount(username, password, deleteOnly = false) {
   let accounts = storage.getSync('savedAccounts');
   let exists = accounts[username] !== undefined;
   if(exists) delete accounts[username];
@@ -264,52 +398,67 @@ function updateAccount(mainWindow, username, password, deleteOnly = false) {
     accounts[username] = encryptedPassword;
   }
 
-  storage.set('savedAccounts', accounts, function(error) {
+  storage.set('savedAccounts', accounts, (error) => {
     if (error) throw error;
-    createAppMenu(mainWindow);
+    createAppMenu();
     mainWindow.webContents.send('client-message', {statusMessage: `Account ${username} ${deleteOnly?'removed':(exists?'updated':'added')}...`});
   });
 }
 
 //decrypt password and send to client
-function sendClientLogin(mainWindow, username, encryptedPassword) {
+function sendClientLogin(username, encryptedPassword) {
   const bufferToDecrypt = Buffer.from(encryptedPassword, 'latin1');
   const decryptedPassword = safeStorage.decryptString(bufferToDecrypt);
   mainWindow.webContents.send('client-login', { username, decryptedPassword });
   mainWindow.webContents.send('client-message', {statusMessage: `Logging in as ${username}...`});
+  accounts.lastLogin = username;
+
+  storage.set('savedAccounts', accounts, (error) => {
+    if (error) throw error;
+    createAppMenu();
+  });
+}
+
+//capture screenshot of mainWindow
+function takeScreenshot(){
+  mainWindow.webContents.capturePage().then(image => {
+    if (!fs.existsSync(settings.screenshotsPath)) fs.mkdirSync(settings.screenshotsPath);
+    fs.writeFile(path.join(settings.screenshotsPath, `screenshot-${Date.now()}.png`), image.toPNG(), (err) => {
+      if (err) throw err
+      mainWindow.webContents.send('client-message', {'playScreenshotAudio': true});
+      mainWindow.webContents.send('client-message', {statusMessage: `Screenshot saved!`, timeout: 2000});
+    })
+  })
 }
 
 //build menu
-async function createAppMenu(mainWindow) {
-  worlds = await fetchWorlds(mainWindow,worlds);
-  currentWorld = storage.getSync('savedWorld');
-  lowMem = storage.getSync('savedLowMem');
-  idleTimer = storage.getSync('savedIdleTimer');
-  sessionTimer = storage.getSync('savedSessionTimer');
+async function createAppMenu() {
+  worlds = await fetchWorlds(worlds);
+  pkg = await fetchPKG();
+  settings = storage.getSync('savedSettings');
   accounts = storage.getSync('savedAccounts');
-  latencyThreshold = storage.getSync('savedLatencyThreshold');
 
   let worldMenu = [{label: "Players Online: " + worlds.reduce((sum, w) => sum + w.count, 0), disabled: true},...worlds.map(world => ({
     label: `World ${world.world} ${world.location} - ${world.ms}ms - ${world.p2p? 'P2P' : 'F2P'} - ${world.count} players`,
     type: 'radio',
-    checked: world.world === currentWorld,
+    checked: world.world === settings.world,
     click: () => {
-      createAppMenu(mainWindow);
+      createAppMenu();
 
       function doWorldChange(){
-        currentWorld = world.world;
-        storage.set('savedWorld', currentWorld, function(error) {
+        settings.world = world.world;
+        storage.set('savedSettings', settings, (error) => {
           if (error) throw error;
           mainWindow.webContents.send('client-message', {statusMessage: `Switching to World ${world.world}...`});
-          mainWindow.loadURL(lowMem.value?world.ld:world.hd);
+          mainWindow.loadURL(settings.lowMem?world.ld:world.hd);
           mainWindow.title = defaultTitle + `  |  World ${world.world} ${world.location}`;
-          createAppMenu(mainWindow);
+          createAppMenu();
           pingHistory = [];
         });
       }
 
       if(loginStatus == true){
-        prompt({...warningDefaults,
+        Prompt({...warningDefaults,
           description : 'You are currently logged in! Changing worlds now will not log you out and your character will be in game for 60 seconds. Are you sure you want to continue?'
         },mainWindow)
         .then((r) => {
@@ -320,21 +469,21 @@ async function createAppMenu(mainWindow) {
   }))];
 
   function detailSwitch(lm){
-    createAppMenu(mainWindow);
+    createAppMenu();
 
     function doChangeMem(lm){
-      lowMem = {value: lm===1?true:false};
-      storage.set('savedLowMem', lowMem, function(error) {
+      settings.lowMem = lm===1?true:false;
+      storage.set('savedSettings', settings, (error) => {
         if (error) throw error;
         mainWindow.webContents.send('client-message', {statusMessage: `Switching to ${lm===1?'Low':'High'} Detail...`});
         mainWindow.loadURL(mainWindow.webContents.getURL().replace(/lowmem=(\d)/, `lowmem=${lm}`));
-        createAppMenu(mainWindow);
+        createAppMenu();
         pingHistory = [];
       });
     }
 
     if(loginStatus == true){
-      prompt({...warningDefaults,
+      Prompt({...warningDefaults,
         description : 'You are currently logged in! Changing client detail now will not log you out and your character will be in game for 60 seconds. Are you sure you want to continue?'
       },mainWindow)
       .then((r) => {
@@ -346,15 +495,15 @@ async function createAppMenu(mainWindow) {
   let accountsMenu = [
     {
       label: '+ Add Account',
-      click: () => addUpdateAccountPrompt(mainWindow)
+      click: () => addUpdateAccountPrompt()
     },
     {
       label: 'Manage Accounts',
-      submenu: Object.keys(accounts).map((username) => ({
+      submenu: Object.keys(accounts).filter((u)=>u!=='lastLogin').map((username) => ({
         label: username,
         submenu: [
-        { label: 'Update Account', click: () => addUpdateAccountPrompt(mainWindow, username) },
-        { label: 'Remove Account', click: () => updateAccount(mainWindow, username, null, true) }
+        { label: 'Update Account', click: () => addUpdateAccountPrompt( username) },
+        { label: 'Remove Account', click: () => updateAccount(username, null, true) }
       ]
       }))
     },
@@ -367,13 +516,19 @@ async function createAppMenu(mainWindow) {
       if(loginStatus){
         return [{label: `You're already logged in!`, disabled: true}]
       }else{
-        return Object.entries(accounts).map(([username, encryptedPassword]) => ({
+        let lastLogin = accounts.lastLogin && accounts[accounts.lastLogin] ? [{
+          label: `Quick Login: \n${accounts.lastLogin}`,
+          accelerator: settings.kb_quickLogin,
+          click: () => sendClientLogin(accounts.lastLogin, accounts[accounts.lastLogin])
+        },{type: 'separator'}] : [];
+
+        return [...lastLogin, ...Object.entries(accounts).filter(([u])=>u!=='lastLogin').map(([username, encryptedPassword]) => ({
           label: username,
-          click: () => sendClientLogin(mainWindow, username, encryptedPassword)
-        }))
+          click: () => sendClientLogin(username, encryptedPassword)
+        }))];
       }
     })()
-  ]
+  ];
 
   const template = [
     {
@@ -386,8 +541,8 @@ async function createAppMenu(mainWindow) {
       label: 'Options',
       submenu: [
         { label: 'Game Detail', submenu:[
-          { label: 'Low Detail', type: 'radio', checked: lowMem.value, click: () => detailSwitch(1)},
-          { label: 'High Detail', type: 'radio', checked: !lowMem.value, click: () => detailSwitch(0)}
+          { label: 'Low Detail', type: 'radio', checked: settings.lowMem, click: () => detailSwitch(1)},
+          { label: 'High Detail', type: 'radio', checked: !settings.lowMem, click: () => detailSwitch(0)}
         ]},
         { label: 'Login Screen Music', submenu:[
           { label: 'Off', value: false },
@@ -395,14 +550,14 @@ async function createAppMenu(mainWindow) {
         ].map(option => ({
             label: option.label,
             type: 'radio',
-            checked: loginMusic.value === option.value,
+            checked: settings.loginMusic === option.value,
             click: () => {
-              loginMusic = { value: option.value };
+              settings.loginMusic = option.value;
 
-              storage.set('savedLoginMusic', loginMusic, function (error) {
+              storage.set('savedSettings', settings, (error) => {
                 if (error) throw error;
-                mainWindow.webContents.send('client-message', {LoginMusic: loginMusic.value});
-                createAppMenu(mainWindow);
+                mainWindow.webContents.send('client-message', settings);
+                createAppMenu();
               });
             }
         }))},
@@ -414,13 +569,13 @@ async function createAppMenu(mainWindow) {
         ].map(option => ({
             label: option.label,
             type: 'radio',
-            checked: idleTimer.value === option.value,
+            checked: settings.idleTimer === option.value,
             click: () => {
-              idleTimer = { value: option.value };
+              settings.idleTimer = option.value;
 
-              storage.set('savedIdleTimer', idleTimer, function (error) {
+              storage.set('savedSettings', settings, (error) => {
                 if (error) throw error;
-                mainWindow.webContents.send('client-message', {IdleTimer: option.value});
+                mainWindow.webContents.send('client-message', settings);
               });
             }
         }))},
@@ -431,13 +586,13 @@ async function createAppMenu(mainWindow) {
         ].map(option => ({
           label: option.label,
           type: 'radio',
-          checked: sessionTimer.value === option.value,
+          checked: settings.sessionTimer === option.value,
           click: () => {
-            sessionTimer = { value: option.value };
+            settings.sessionTimer = option.value;
 
-            storage.set('savedSessionTimer', sessionTimer, function (error) {
+            storage.set('savedSettings', settings, (error) => {
               if (error) throw error;
-              mainWindow.webContents.send('client-message', {SessionTimer: option.value});
+              mainWindow.webContents.send('client-message', settings);
             });
           }
         }))},
@@ -449,21 +604,26 @@ async function createAppMenu(mainWindow) {
         ].map(option => ({
             label: option.label,
             type: 'radio',
-            checked: latencyThreshold.value === option.value,
+            checked: settings.latencyThreshold === option.value,
             click: () => {
-              latencyThreshold = { value: option.value };
+              settings.latencyThreshold = option.value;
 
-              storage.set('savedLatencyThreshold', latencyThreshold, function (error) {
+              storage.set('savedSettings', settings, (error) => {
                 if (error) throw error;
               });
             }
         }))},
-      ]
+      {
+        type: 'separator'
+      },{
+        label: 'Edit Bindings',
+        click: () => openSettingsPrompt()
+      }]
     },
     {
       label: 'World Select',
       id: 'world-select',
-      submenu: worldMenu
+      submenu: worlds.length ? worldMenu : [{label: 'No world data found...', disabled: true}]
     },
     {
       label: 'Accounts',
@@ -472,31 +632,31 @@ async function createAppMenu(mainWindow) {
     },
     {
       label: 'Take Screenshot',
-      click: () => {
-        mainWindow.webContents.capturePage().then(image => {
-          fs.writeFile(path.join(screenshots, `screenshot-${Date.now()}.png`), image.toPNG(), (err) => {
-            if (err) throw err
-            mainWindow.webContents.send('client-message', {'playScreenshotAudio': true});
-            mainWindow.webContents.send('client-message', {statusMessage: `Screenshot saved!`, timeout: 2000});
-          })
-        })
-      }
+      accelerator: settings.kb_screenshot,
+      click: () => takeScreenshot()
     },
     {
       label: 'View',
       submenu: [
-        { label: 'Open World Map', click: () => createMapWindow(mainWindow) },
-        { label: 'Open Screenshots Folder', click: () => { shell.openPath(screenshots); } },
+        { label: 'Open World Map', accelerator: settings.kb_worldMap, click: () => createMapWindow() },
+        { label: 'Open Screenshots Folder', click: () => { shell.openPath(settings.screenshotsPath); } },
         { label: 'Open Dev Tools', role: 'toggleDevTools', accelerator: '' },
+        { label: 'Reload Client', accelerator: settings.kb_refresh, click: () => mainWindow.loadURL(mainWindow.webContents.getURL())},
         { type:  'separator' },
         { label: 'Lost City Website', click: () => { shell.openExternal('https://2004.lostcity.rs/'); } },
         { label: 'Project Github', click: () => { shell.openExternal('https://github.com/Slaying-dev/Entrana-Launcher'); } },
         { type:  'separator' },
-        { label: 'Version ' + app.getVersion(), enabled: false }
+        { label: 'Version ' + app.getVersion(), enabled: false },
+        ...(()=>{
+          if(app.getVersion() !== pkg.version) return [{
+            label: `Version ${pkg.version} available!`,
+            click: () => { shell.openExternal('https://github.com/Slaying-dev/Entrana-Launcher/releases/latest'); }
+          }]; else return []
+        })()
       ]
     }
   ];
   
   mainWindow.setMenu(Menu.buildFromTemplate(template));
-  mainWindow.title = defaultTitle + `  |  World ${currentWorld} ${worlds.find(w=>w.world === currentWorld).location}`;
+  mainWindow.title = defaultTitle + `  |  World ${settings.world} ${worlds.length?worlds.find(w=>w.world === settings.world).location:''}`;
 };

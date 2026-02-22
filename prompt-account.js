@@ -1,4 +1,6 @@
 module.exports = () => {
+    document.querySelector('#data-container').classList.add('account-form')
+
     //add note about password storage
     let note = document.createElement('div');
     note.id = 'note';
