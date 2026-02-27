@@ -1,6 +1,6 @@
 {
   "name": "entrana",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "minimalist lost city launcher",
   "main": "main.js",
   "scripts": {

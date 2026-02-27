@@ -11,6 +11,10 @@ module.exports = () => {
 
     //run through inputs and replace keybind type inputs with the keybind lib fields
     let container = document.querySelector('#data-container');
+    let splitContainer1 = document.createElement('div');
+    let splitContainer2 = document.createElement('div');
+    container.before(splitContainer1,splitContainer2);
+
     [...container.querySelectorAll('input[type="keybind"]')].forEach(el => {
         let kb_container = document.createElement('div');
         el.before(kb_container);
@@ -34,6 +38,7 @@ module.exports = () => {
         })
     });
 
+    //this is only currently used for PrintScreen events because windows disables it as a binding
     ipcRenderer.on('force-event', function (event, key) {
         let el = document.activeElement;
         if(el && el.classList.contains('bind-input')){
@@ -81,6 +86,34 @@ module.exports = () => {
         if(directoryData.dir !== false){
             container.querySelector(`input[name='${directoryData.name}']`).value = directoryData.dir;
         }
+    });
+
+    //split settings into 2 columns
+    let children = document.querySelectorAll('#data-container > *');
+    splitContainer2.append(...[...children].slice(-10));
+    children = document.querySelectorAll('#data-container > *');
+    splitContainer1.append(...children);
+    container.append(splitContainer1,splitContainer2);
+
+
+    //range input label updates
+    [...container.querySelectorAll('input[type=range]')].forEach(el => {
+        if(el.dataset.value) el.value = el.dataset.value; //fix for >100 values, not sure why this isnt working
+
+        function setLabel(t){
+            t.previousElementSibling.textContent = `${t.previousElementSibling.textContent.split(' - ')[0]} - ${t.dataset.prefix||''}${t.value}${t.dataset.suffix||''}`
+        }
+
+        el.addEventListener('input', (e) => {
+            setLabel(e.target);
+
+            //we want to update the client with the new volume settings before actually closing the settings window
+            //so you can actually hear the volume change in real time
+            if(e.target.name.startsWith('vol_')){
+                ipcRenderer.send('volume-change', {name: e.target.name, value: parseInt(e.target.value)}); 
+            }
+        });
+        setLabel(el);
     });
 
 };

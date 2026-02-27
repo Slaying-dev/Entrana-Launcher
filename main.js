@@ -12,20 +12,29 @@ if (!fs.existsSync(storagePath)) fs.mkdirSync(storagePath);
 storage.setDataPath(storagePath);
 
 const defaultTitle = "Entrana  |  Lost City Launcher";
-let mainWindow, mapWindow, worlds = [], loginStatus = false, accounts = {}, settings = {}, lastWorldUpdate = 0, pingHistory = [], pkg = { lastcall:0 }, registeredShortcuts = {};
+let mainWindow, mapWindow, worlds = [], loginStatus = false, accounts = {}, settings = {}, lastWorldUpdate = 0, pingHistory = [], pkg = { lastcall:0 }, registeredShortcuts = {}, settingsOpen;
 
 const settingDefaults = {
-  world : '2',
-  lowMem : false,
-  idleTimer : 10,
-  sessionTimer : 'time',
-  loginMusic : true,
-  latencyThreshold : 50,
-  screenshotsPath : path.join(storagePath, 'Screenshots'),
-  kb_screenshot : 'Ctrl+PrintScreen',
-  kb_quickLogin : 'Home',
-  kb_worldMap : 'Ctrl+M',
-  kb_refresh : 'Ctrl+Shift+Alt+R' //want this default to be hard to accidentally press since it purposely doesnt check for login
+  world: '2',
+  lowMem: false,
+  idleTimer: true,
+  idleTimerThreshold: 10,
+  sessionTimer: 'time',
+  loginMusic: true,
+  latencyWarning: true,
+  latencyWarningThreshold: 100,
+  screenshotsPath: path.join(storagePath, 'Screenshots'),
+  kb_screenshot: 'Ctrl+PrintScreen',
+  kb_quickLogin: 'Home',
+  kb_worldMap: 'Ctrl+M',
+  kb_refresh: 'Ctrl+Shift+Alt+R', //want this default to be hard to accidentally press since it purposely doesnt check for login
+  vol_music: 5,
+  vol_sfx: 10,
+  vol_entrana: 40,
+  ssc_level: true,
+  ssc_treasure: true,
+  ssc_quest: true,
+  ssc_death: true
 }
 
 const warningDefaults = {
@@ -62,9 +71,12 @@ function createWindow () {
   })
 
   mainWindowState.manage(mainWindow);
-
+  
   mainWindow.loadURL(`https://w${settings.world}-2004.lostcity.rs/rs2.cgi?plugin=0&world=${settings.world}&lowmem=${settings.lowMem?1:0}`);
-
+  
+  //show blank menu until our menu is created. otherwise we see electron default menu
+  mainWindow.setMenu(Menu.buildFromTemplate([{label:'',disabled:true}]));
+  
   createAppMenu();
   setInterval(() => createAppMenu(), 10*1000); //update player counts/latency
 
@@ -84,6 +96,26 @@ function createWindow () {
     loginStatus = loggedIn;
     createAppMenu();
   });
+
+  ipcMain.on('take-category-screenshot', (_, data) => {
+    if(settings[`ssc_${data.category}`]) takeScreenshot(data);
+  });
+
+  ipcMain.on('volume-change', (_, data) => {
+    mainWindow.webContents.send('client-message', {[data.name] : data.value});
+  });
+
+  ipcMain.on('chat-logger', (_, entry) => {
+    let chatLogPath = path.join(storagePath, [1,2].includes(entry.type)?'publicChat.log':'privateChat.log');
+    let user = entry.user.startsWith('@cr') ? `[${entry.user.startsWith('@cr1')?'MOD':'ADMIN'}}] ${entry.user.substring(5)}` : entry.user;
+    if(entry.type == 6) user = `To ${user}`; if(entry.type == 3 || entry.type == 7) user = `From ${user}`;
+    fs.appendFile(chatLogPath, `${new Date().toISOString()} | ${user}: ${entry.message}\n`, (err) => {
+      if (err) {
+        console.error('Error writing file:', err);
+        return;
+      }
+    });
+  })
 
   ipcMain.on('prompt-for-directory', async(_, {name, current}) => {
     const win = BrowserWindow.getFocusedWindow();
@@ -142,6 +174,8 @@ function createMapWindow() {
       height: 542,
       parent: mainWindow,
       resizable: false,
+      minimizable: false,
+      maximizable: false,
       menuBarVisible: false,
       backgroundColor: '#000000',
       modal: false,
@@ -165,7 +199,7 @@ function createMapWindow() {
 }
 
 app.whenReady().then(() => {
-
+  
   //load stored data and set defaults
   accounts = storage.getSync('savedAccounts');
   settings = {...settingDefaults, ...storage.getSync('savedSettings')};
@@ -177,14 +211,23 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
-})
+
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
-})
+});
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+});
+
+app.on('browser-window-focus', () => {
+  if(!settingsOpen) restoreAllBindings()
+});
+
+app.on('browser-window-blur', () => {
+  if(!settingsOpen) globalShortcut.unregisterAll()
 });
 
 function registerUpdateShortcut(name, accelerator, callback){
@@ -211,6 +254,9 @@ function restoreAllBindings(){
 }
 
 function openSettingsPrompt(){
+  settingsOpen = true;
+  settings = storage.getSync('savedSettings');
+
   //disable keybinds while settings open
   globalShortcut.unregisterAll();
 
@@ -220,18 +266,68 @@ function openSettingsPrompt(){
     BrowserWindow.getFocusedWindow().webContents.send('force-event', 'PrintScreen');
   });
 
+  globalShortcut.register('Ctrl+Shift+I', () => {
+    BrowserWindow.getFocusedWindow().webContents.openDevTools()
+  })
+
   Prompt({
-    title: 'Edit Bindings',
+    title: 'Entrana Settings',
     label: '',
     icon: './icon.ico',
-    buttonLabels:{ok:'Update Bindings', cancel:'Cancel'},
-    width: 400,
+    buttonLabels:{ok:'Save Settings', cancel:'Cancel'},
+    width: 800,
     height: 500,
     menuBarVisible: false,
     customStylesheet: path.join(__dirname, 'prompt.css'),
     customScript: path.join(__dirname, 'prompt-settings.js'),
     type: 'multiInput',
     multiInputOptions: [{
+      label: 'Game Music Volume',
+      value: settings.vol_music,
+      inputAttrs: {
+        type: 'range',
+        name: 'vol_music',
+        'data-suffix': '%'
+      }
+    },{
+      label: 'Game Effects Volume',
+      value: settings.vol_sfx,
+      inputAttrs: {
+        type: 'range',
+        name: 'vol_sfx',
+        'data-suffix': '%'
+      }
+    },{
+      label: 'Entrana Warnings Volume',
+      value: settings.vol_entrana,
+      inputAttrs: {
+        type: 'range',
+        name: 'vol_entrana',
+        'data-suffix': '%'
+      }
+    },{
+      label: 'Idle Warning Threshold',
+      value: settings.idleTimerThreshold,
+      inputAttrs: {
+        type: 'range',
+        name: 'idleTimerThreshold',
+        min: 0,
+        max: 89,
+        'data-suffix': 'sec'
+      }
+    },{
+      label: 'Latency Spike Threshold',
+      inputAttrs: {
+        type: 'range',
+        name: 'latencyWarningThreshold',
+        min: 25,
+        max: 500,
+        step: 25,
+        'data-value': settings.latencyWarningThreshold,
+        'data-suffix': '% ms',
+        'data-prefix': '+'
+      }
+    },{
       label: 'Screenshot Save Directory',
       value: settings.screenshotsPath,
       inputAttrs: {
@@ -269,27 +365,34 @@ function openSettingsPrompt(){
     }]
   },mainWindow)
   .then((r) => {
-      //unregister all those PrintScreen globals again
-      globalShortcut.unregisterAll();
+    settingsOpen = false;
 
-      //update bindings and restore
-      if(r === null) restoreAllBindings();
-      else {
-        settings = {...settings, ...{
-          screenshotsPath: r[0],
-          kb_screenshot: r[1].replaceAll( ' ', '' ),
-          kb_quickLogin: r[2].replaceAll( ' ', '' ),
-          kb_worldMap: r[3].replaceAll( ' ', '' ),
-          kb_refresh: r[4].replaceAll( ' ', '' )
-        }};
+    //unregister all those PrintScreen globals again
+    globalShortcut.unregisterAll();
 
-        storage.set('savedSettings', settings, (error) => {
-          if (error) throw error;
-          restoreAllBindings();
-          mainWindow.webContents.send('client-message', {statusMessage: `Bindings updated...`, timeout: 1000});
-          createAppMenu();
-        });        
-      }
+    //update bindings and restore
+    if(r === null) restoreAllBindings();
+    else {
+      settings = {...settings, ...{
+        vol_music: r[0],
+        vol_sfx: r[1],
+        vol_entrana: r[2],
+        idleTimerThreshold: r[3],
+        latencyWarningThreshold: r[4],
+        screenshotsPath: r[5],
+        kb_screenshot: r[6].replaceAll( ' ', '' ),
+        kb_quickLogin: r[7].replaceAll( ' ', '' ),
+        kb_worldMap: r[8].replaceAll( ' ', '' ),
+        kb_refresh: r[9].replaceAll( ' ', '' )
+      }};
+
+      storage.set('savedSettings', settings, (error) => {
+        if (error) throw error;
+        restoreAllBindings();
+        mainWindow.webContents.send('client-message', {...settings, statusMessage: `Bindings updated...`, timeout: 1000});
+        createAppMenu();
+      });        
+    }
   }).catch(console.error);
 }
 
@@ -317,12 +420,12 @@ async function fetchWorlds(worlds) {
     //compare current world ping to history to determine spike
     const currentWorldPing = worldsData.find(s => s.world == settings.world).ms;
     let spike = false;
-    if(settings.latencyThreshold !== false){
+    if(settings.latencyWarning !== false){
       const max_history = 20;
       if(pingHistory.length >= max_history/2){
         const baseline = med(pingHistory);
         const percentDiff = ((currentWorldPing - baseline) / baseline) * 100;
-        if(percentDiff > settings.latencyThreshold) spike = true;
+        if(percentDiff > parseInt(settings.latencyWarningThreshold)) spike = true;
       }
       pingHistory.push(currentWorldPing);
       if(pingHistory.length > max_history) pingHistory.shift();
@@ -410,7 +513,6 @@ function sendClientLogin(username, encryptedPassword) {
   const bufferToDecrypt = Buffer.from(encryptedPassword, 'latin1');
   const decryptedPassword = safeStorage.decryptString(bufferToDecrypt);
   mainWindow.webContents.send('client-login', { username, decryptedPassword });
-  mainWindow.webContents.send('client-message', {statusMessage: `Logging in as ${username}...`});
   accounts.lastLogin = username;
 
   storage.set('savedAccounts', accounts, (error) => {
@@ -420,10 +522,16 @@ function sendClientLogin(username, encryptedPassword) {
 }
 
 //capture screenshot of mainWindow
-function takeScreenshot(){
+function takeScreenshot(data){
   mainWindow.webContents.capturePage().then(image => {
     if (!fs.existsSync(settings.screenshotsPath)) fs.mkdirSync(settings.screenshotsPath);
-    fs.writeFile(path.join(settings.screenshotsPath, `screenshot-${Date.now()}.png`), image.toPNG(), (err) => {
+
+    let savePath = path.join(settings.screenshotsPath, `screenshot-${Date.now()}.png`);
+    if(data && data.category && !fs.existsSync(path.join(settings.screenshotsPath, data.category))) fs.mkdirSync(path.join(settings.screenshotsPath, data.category));
+    if(data && data.category) savePath = path.join(settings.screenshotsPath, data.category, `screenshot-${Date.now()}.png`);
+    if(data && data.category && data.skill) savePath = path.join(settings.screenshotsPath, data.category, `screenshot-${data.skill.replaceAll(' ','')}-${Date.now()}.png`);
+
+    fs.writeFile(savePath, image.toPNG(), (err) => {
       if (err) throw err
       mainWindow.webContents.send('client-message', {'playScreenshotAudio': true});
       mainWindow.webContents.send('client-message', {statusMessage: `Screenshot saved!`, timeout: 2000});
@@ -563,9 +671,7 @@ async function createAppMenu() {
         }))},
         { label: 'Idle Timer', submenu:[
           { label: 'Off', value: false },
-          { label: 'No Warning', value: 0 },
-          { label: '5s Warning', value: 5 },
-          { label: '10s Warning', value: 10 },
+          { label: 'On', value: true }
         ].map(option => ({
             label: option.label,
             type: 'radio',
@@ -576,6 +682,7 @@ async function createAppMenu() {
               storage.set('savedSettings', settings, (error) => {
                 if (error) throw error;
                 mainWindow.webContents.send('client-message', settings);
+                createAppMenu();
               });
             }
         }))},
@@ -598,25 +705,43 @@ async function createAppMenu() {
         }))},
         { label: 'Latency Spike Warnings', submenu:[
           { label: 'Off', value: false },
-          { label: '+50% threshold', value: 50 },
-          { label: '+75% threshold', value: 75 },
-          { label: '+100% threshold', value: 100 },
+          { label: 'On', value: true }
         ].map(option => ({
             label: option.label,
             type: 'radio',
-            checked: settings.latencyThreshold === option.value,
+            checked: settings.latencyWarning === option.value,
             click: () => {
-              settings.latencyThreshold = option.value;
+              settings.latencyWarning = option.value;
+
+              storage.set('savedSettings', settings, (error) => {
+                if (error) throw error;
+                mainWindow.webContents.send('client-message', settings);
+                createAppMenu();
+              });
+            }
+        }))},
+      {
+        label: 'Auto-Screenshots',
+        submenu: [...Object.entries(settings).filter(([key]) => key.startsWith('ssc_')).map(([key,value]) => {
+          let labels = {'level':'Level Ups','treasure':'Treasure Trail Complete','quest':'Quest Complete','death':'Deaths'}
+          return {
+            label: labels[key.split('_')[1]],
+            type: 'checkbox',
+            checked: settings[key],
+            click: (item) => {
+              settings[key] = item.checked;
 
               storage.set('savedSettings', settings, (error) => {
                 if (error) throw error;
               });
             }
-        }))},
+          }
+        })]
+      },
       {
         type: 'separator'
       },{
-        label: 'Edit Bindings',
+        label: 'Settings',
         click: () => openSettingsPrompt()
       }]
     },
@@ -640,6 +765,7 @@ async function createAppMenu() {
       submenu: [
         { label: 'Open World Map', accelerator: settings.kb_worldMap, click: () => createMapWindow() },
         { label: 'Open Screenshots Folder', click: () => { shell.openPath(settings.screenshotsPath); } },
+        { label: 'Open Settings/Logs Folder', click: () => { shell.openPath(storagePath); } },
         { label: 'Open Dev Tools', role: 'toggleDevTools', accelerator: '' },
         { label: 'Reload Client', accelerator: settings.kb_refresh, click: () => mainWindow.loadURL(mainWindow.webContents.getURL())},
         { type:  'separator' },

@@ -65,9 +65,12 @@ h2 > .label-desc
 
 #data-container {
     text-align: left;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 20px;
 }
 
-#data-container > label {
+#data-container > div label {
     text-align: left;
     font-size: 0.95rem;
     padding-bottom: 0px;
@@ -253,7 +256,7 @@ div.keybind, div.dir-container {
     justify-content: center;
 }
 
-div.keybind:last-of-type{
+#data-container > div input:last-of-type, #data-container > div .keybind:last-of-type{
     margin-bottom: 0 !important;
 }
 
@@ -398,4 +401,20 @@ input[type='directoryChoose'] {
 
 .has-conflict {
   border-color: hsl(5, 75%, 44%) !important;
+}
+
+#data-container input[type='range']{
+    padding-left:0 !important;
+    padding-right: 0 !important;
+}
+
+#data-container input[type='range']::-webkit-slider-thumb {
+    transform: scale(1.2);
+    cursor:ew-resize;
+}
+
+#data-container input[type='range']::-webkit-slider-thumb:hover,
+#data-container input[type='range']::-webkit-slider-thumb:focus,
+#data-container input[type='range']::-webkit-slider-thumb:active {
+    transform: scale(1.5);
 }
