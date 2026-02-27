@@ -9,12 +9,12 @@ Goal for the project is a minimalist launcher for Lost City with a few important
 - [Session Timer in either Game Ticks or Real Time](#session-timer-and-idle-timer)
 - [Latency Spike Warnings](#latency-spike-warnings)
 - [Account manager with local encrypted password storage](#account-manager---1-click-login)
-- [Keybinds & screenshot save directory editor](#bindings-editor)
+- [Keybinds & Settings editor](#settings-editor)
 - [World Select with player count and region](#world-select)
 - [Built in World Map](#world-map)
 - [Login screen music toggle](#other-options)
 - [Detail select](#other-options)
-- [Screenshots](#other-options)
+- [Automatic Screenshots for Game Events](#other-options)
 - [Warnings for changing detail, world, or closing the launcher if you are currently logged in](#safe-logout-warnings)
 - [Light and Dark modes](#light-and-dark-modes)
 
@@ -42,10 +42,9 @@ Also saves your previously logged in account and allows you to set a keybind to 
 <img width="100%" alt="image" src="https://github.com/user-attachments/assets/0de35eb5-2ab5-47cc-b12e-5d0aef540599" />
 
 
-### Bindings Editor
-Edit your bound screenshot save folder and assigned bound keys
+### Settings Editor
 
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/df19687f-1bd9-4e9f-9859-9db075eeaf21" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/0ed4950a-e818-4193-afba-fb3f640b58c5" />
 
 
 ### World Select
@@ -65,8 +64,9 @@ Set your threshold in Options or turn off the warning
 
 
 ### Other Options
+Automatic screenshots for various events in game
 
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/cd1cc6bd-12e3-4561-8664-0b2a1aca6fbb" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/c2bddd1b-3e7a-4ccf-bf7e-331fcc61b6bd" />
 
 
 ### Safe Logout Warnings
